@@ -179,3 +179,9 @@ pytest tests/ -v
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
+
+---
+
+## Built at
+
+This project was built at the **Build with Gemma 4** buildathon on May 29, 2025.
