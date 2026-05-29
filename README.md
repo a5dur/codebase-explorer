@@ -24,6 +24,7 @@ Samsung is not an outlier. Any time you paste code into a cloud AI interface, th
 Codebase Explorer is a local-first alternative to tools like Sourcegraph — no cloud, no API keys, no data sent anywhere. You point it at a repo, it indexes the code on your machine, and you chat with it using plain English.
 
 Every answer is grounded in real code. The model doesn't hallucinate file paths — it searches first, reads the files, then responds. Click any `[file.py:42]` citation in the answer to open that exact line in a syntax-highlighted viewer.
+<img width="1458" height="831" alt="image" src="https://github.com/user-attachments/assets/ca2f2c86-d607-496d-82f8-e72ad865aa70" />
 
 ---
 
