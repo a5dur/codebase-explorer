@@ -1,4 +1,5 @@
 # Codebase Explorer
+<img width="491" height="493" alt="image" src="https://github.com/user-attachments/assets/75267e45-34a5-4844-9b95-b66b5decc175" />
 
 Ask natural language questions about any GitHub repository — public or private. Answers stream back with inline file citations. Everything runs locally. Nothing leaves your machine.
 
