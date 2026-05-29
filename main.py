@@ -233,37 +233,22 @@ def lookup_symbol(repo_name: str, name: str) -> dict[str, str]:
 
 # ── Agentic loop ──────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are an expert software engineer helping a user understand a codebase.
+SYSTEM_PROMPT = """You are a software engineer assistant. Help the user understand a codebase.
 
-You have access to the following tools. Use them to find relevant code before answering.
-
-TOOLS:
-1. search_code(query) — Search all files for a string or keyword. Returns matching lines with file paths and line numbers.
-2. get_file(path) — Read the full content of a specific file.
-3. list_symbols(name) — Look up where a function/class is defined.
-4. get_file_tree() — Get the full directory structure.
+TOOLS (call before answering — do not guess):
+- search_code(query) — find files containing a string
+- get_file(path) — read a file's full content
+- list_symbols(name) — find where a function/class is defined
+- get_file_tree() — get full directory listing
 
 RULES:
-- ALWAYS use tools to find relevant code before answering. Do not guess.
-- When you reference code in your answer, ALWAYS include a citation in this exact format: [filepath:line_number]
-- Citations must be real file paths from the codebase, not made up.
-- After using 1-3 tool calls, synthesize your findings into a clear, concise answer.
-- If you cannot find something after 3 searches, say so honestly.
+- Use 1-3 tool calls to find relevant code, then answer.
+- Always cite code as [filepath:line_number] using real paths.
+- If you can't find it after 3 searches, say so.
 
-TOOL CALL FORMAT (use exactly this — no variation):
+TOOL FORMAT (exact):
 <tool_call>
-{"tool": "search_code", "query": "authentication"}
-</tool_call>
-
-Other examples:
-<tool_call>
-{"tool": "get_file", "path": "src/auth.py"}
-</tool_call>
-<tool_call>
-{"tool": "list_symbols", "name": "AuthMiddleware"}
-</tool_call>
-<tool_call>
-{"tool": "get_file_tree"}
+{"tool": "search_code", "query": "your query"}
 </tool_call>"""
 
 
@@ -285,12 +270,14 @@ async def call_lmstudio_sync(messages: list[dict]) -> str:
                 "model": LM_STUDIO_MODEL,
                 "messages": messages,
                 "temperature": 0.2,
-                "max_tokens": 1500,
+                "max_tokens": 2048,
                 "stream": False,
             },
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        msg = response.json()["choices"][0]["message"]
+        # Gemma 4 thinking mode: answer in "content", reasoning in "reasoning_content"
+        return msg.get("content") or msg.get("reasoning_content", "")
 
 
 async def stream_lmstudio(messages: list[dict]):
@@ -311,7 +298,9 @@ async def stream_lmstudio(messages: list[dict]):
                     continue
                 try:
                     chunk = json.loads(line[6:])
-                    delta = chunk["choices"][0]["delta"].get("content", "")
+                    delta_obj = chunk["choices"][0]["delta"]
+                    # Prefer "content" over "reasoning_content" (thinking tokens)
+                    delta = delta_obj.get("content") or ""
                     if delta:
                         yield delta
                 except (json.JSONDecodeError, KeyError, IndexError):
@@ -325,9 +314,15 @@ async def agentic_chat(repo_name: str, question: str, history: list[dict]):
         messages.append(turn)
 
     file_tree = REPO_CACHE[repo_name]["file_tree"]
+    tree_lines = file_tree.splitlines()
+    # Truncate to 60 lines — model can call get_file_tree() for full listing
+    if len(tree_lines) > 60:
+        tree_summary = "\n".join(tree_lines[:60]) + f"\n... ({len(tree_lines) - 60} more entries — call get_file_tree for full listing)"
+    else:
+        tree_summary = file_tree
     messages.append({
         "role": "user",
-        "content": f"FILE TREE:\n{file_tree}\n\nQUESTION: {question}",
+        "content": f"FILE TREE (top entries):\n{tree_summary}\n\nQUESTION: {question}",
     })
 
     for _ in range(5):
