@@ -9,6 +9,16 @@ Powered by [Gemma 4](https://ai.google.dev/gemma) running in [LM Studio](https:/
 
 ---
 
+## Why local-first matters
+
+In April 2023, Samsung engineers leaked confidential source code to a cloud AI service — three times within 20 days. In one incident, an engineer pasted proprietary semiconductor source code to ask for bug fixes. In another, internal meeting notes were submitted for summarisation. The data was transmitted to external servers and potentially used for model training. Samsung subsequently banned the use of generative AI tools on internal devices. [[Reuters]](https://www.reuters.com/technology/samsung-bans-use-generative-ai-tools-like-chatgpt-after-internal-data-leak-2023-05-02/) [[Bloomberg]](https://www.bloomberg.com/news/articles/2023-05-02/samsung-bans-chatgpt-and-other-generative-ai-use-by-staff-after-leak)
+
+Samsung is not an outlier. Any time you paste code into a cloud AI interface, that code travels to an external server, may be logged, and may be used to improve the model. For proprietary codebases — internal tools, unreleased products, financial systems — that is an unacceptable risk.
+
+**Codebase Explorer eliminates this risk entirely.** The model runs on your hardware. The code never leaves your machine. You get the same AI-assisted code understanding with zero exposure.
+
+---
+
 ## What it does
 
 Codebase Explorer is a local-first alternative to tools like Sourcegraph — no cloud, no API keys, no data sent anywhere. You point it at a repo, it indexes the code on your machine, and you chat with it using plain English.
