@@ -1,1 +1,487 @@
-<!DOCTYPE html><html><body><p>Coming soon</p></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codebase Explorer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100vh; display: flex; flex-direction: column;
+      background: #f6f8fa; color: #1f2328;
+    }
+
+    #warning-banner {
+      display: none; background: #fff3cd;
+      border-bottom: 1px solid #ffc107; padding: 8px 16px;
+      font-size: 13px; color: #664d03;
+    }
+    #warning-banner.visible { display: block; }
+
+    header {
+      background: #fff; border-bottom: 1px solid #d0d7de;
+      padding: 0 16px; height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 16px; font-weight: 600; }
+    #health-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #d1d5da; display: inline-block; margin-right: 6px;
+    }
+    #health-dot.up { background: #2da44e; }
+    #health-label { font-size: 12px; color: #57606a; }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Repo panel ── */
+    #repo-panel {
+      width: 280px; min-width: 200px; background: #fff;
+      border-right: 1px solid #d0d7de;
+      display: flex; flex-direction: column;
+      padding: 12px; gap: 8px; overflow-y: auto; flex-shrink: 0;
+    }
+    #repo-panel input {
+      width: 100%; padding: 6px 8px;
+      border: 1px solid #d0d7de; border-radius: 6px; font-size: 13px;
+    }
+    #clone-btn {
+      width: 100%; padding: 7px; background: #2da44e; color: #fff;
+      border: none; border-radius: 6px; font-size: 13px; font-weight: 500;
+      cursor: pointer;
+    }
+    #clone-btn:hover { background: #218a3b; }
+    #clone-btn:disabled { background: #94d3a2; cursor: not-allowed; }
+    #clone-status { font-size: 12px; color: #57606a; min-height: 16px; }
+    #stats-badge {
+      display: none; font-size: 11px; color: #57606a;
+      background: #f6f8fa; border: 1px solid #d0d7de;
+      border-radius: 12px; padding: 2px 8px;
+    }
+    #stats-badge.visible { display: inline-block; }
+    #file-tree { font-size: 12px; font-family: monospace; line-height: 1.7; flex: 1; }
+    .tree-dir { color: #0969da; font-weight: 500; cursor: default; }
+    .tree-file { color: #1f2328; }
+
+    /* ── Chat panel ── */
+    #chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #messages {
+      flex: 1; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .msg {
+      max-width: 82%; padding: 10px 14px; border-radius: 8px;
+      font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+    }
+    .msg.user {
+      background: #0969da; color: #fff;
+      align-self: flex-end; border-bottom-right-radius: 2px;
+    }
+    .msg.assistant {
+      background: #fff; border: 1px solid #d0d7de;
+      align-self: flex-start; border-bottom-left-radius: 2px;
+    }
+    .citation {
+      background: #ddf4ff; color: #0969da; border-radius: 3px;
+      padding: 1px 4px; cursor: pointer;
+      font-family: monospace; font-size: 12px; white-space: nowrap;
+    }
+    .citation:hover { background: #b6e3ff; }
+    .tool-indicator {
+      font-size: 12px; color: #57606a; padding: 4px 10px;
+      background: #f6f8fa; border: 1px solid #d0d7de;
+      border-radius: 12px; align-self: flex-start;
+    }
+
+    #input-area {
+      border-top: 1px solid #d0d7de; padding: 12px; background: #fff;
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    #question-input {
+      flex: 1; padding: 8px 10px; border: 1px solid #d0d7de;
+      border-radius: 6px; font-size: 14px; resize: none; font-family: inherit;
+      line-height: 1.5; min-height: 38px; max-height: 120px;
+    }
+    #send-btn {
+      padding: 8px 14px; background: #0969da; color: #fff;
+      border: none; border-radius: 6px; font-size: 14px;
+      cursor: pointer; flex-shrink: 0;
+    }
+    #send-btn:hover { background: #0757b8; }
+    #send-btn:disabled { background: #94b8e8; cursor: not-allowed; }
+    #export-btn {
+      padding: 6px 10px; font-size: 12px;
+      border: 1px solid #d0d7de; border-radius: 6px;
+      background: #f6f8fa; cursor: pointer; flex-shrink: 0;
+    }
+    #export-btn:hover { background: #eaeef2; }
+
+    /* ── Modal ── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.visible { display: flex; }
+    #modal {
+      background: #fff; border-radius: 8px;
+      width: 90%; max-width: 860px; max-height: 80vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    }
+    #modal-header {
+      padding: 12px 16px; border-bottom: 1px solid #d0d7de;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    #modal-path { font-family: monospace; font-size: 13px; color: #57606a; }
+    #modal-close {
+      border: none; background: none; font-size: 18px;
+      cursor: pointer; color: #57606a; padding: 0 4px; line-height: 1;
+    }
+    #modal-close:hover { color: #1f2328; }
+    #modal-body { overflow-y: auto; flex: 1; }
+    #modal-body pre { margin: 0; }
+    #modal-body code { display: block; padding: 16px; font-size: 13px; line-height: 1.6; }
+    .highlighted-line { background: #fff3c4 !important; display: block; }
+  </style>
+</head>
+<body>
+
+<div id="warning-banner">
+  ⚠️ LM Studio not detected on port 1234. Start LM Studio and load <code>google/gemma-4-e4b</code> with local server enabled.
+</div>
+
+<header>
+  <h1>🔍 Codebase Explorer</h1>
+  <div>
+    <span id="health-dot"></span>
+    <span id="health-label">Checking LM Studio...</span>
+  </div>
+</header>
+
+<div class="layout">
+  <div id="repo-panel">
+    <input id="repo-url" type="text" placeholder="https://github.com/owner/repo">
+    <input id="github-token" type="password" placeholder="GitHub PAT (optional for public repos)">
+    <button id="clone-btn" onclick="cloneRepo()">Clone &amp; Index</button>
+    <div id="clone-status"></div>
+    <span id="stats-badge"></span>
+    <div id="file-tree"></div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="messages">
+      <div class="msg assistant">Clone a repository on the left, then ask me anything about it.</div>
+    </div>
+    <div id="input-area">
+      <textarea id="question-input" placeholder="Ask anything about this repo…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+      <button id="export-btn" onclick="exportChat()">Export</button>
+      <button id="send-btn" onclick="sendMessage()">Send ▶</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div id="modal">
+    <div id="modal-header">
+      <span id="modal-path"></span>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body">
+      <pre><code id="modal-code"></code></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentRepo = null;
+  let chatHistory = [];
+  let toolIndicatorEl = null;
+
+  // ── Utilities ────────────────────────────────────────────────────────────────
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function escAttr(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
+  // ── Health check ─────────────────────────────────────────────────────────────
+
+  async function checkHealth() {
+    try {
+      const res = await fetch('/health');
+      const data = await res.json();
+      const dot = document.getElementById('health-dot');
+      const label = document.getElementById('health-label');
+      const banner = document.getElementById('warning-banner');
+      if (data.lmstudio) {
+        dot.classList.add('up');
+        label.textContent = 'LM Studio ●';
+        banner.classList.remove('visible');
+      } else {
+        dot.classList.remove('up');
+        label.textContent = 'LM Studio ○';
+        banner.classList.add('visible');
+      }
+    } catch {
+      document.getElementById('health-label').textContent = 'Server offline';
+    }
+  }
+  checkHealth();
+
+  // ── Repo panel ────────────────────────────────────────────────────────────────
+
+  async function cloneRepo() {
+    const url = document.getElementById('repo-url').value.trim();
+    const token = document.getElementById('github-token').value.trim();
+    if (!url) return;
+
+    const btn = document.getElementById('clone-btn');
+    const status = document.getElementById('clone-status');
+    btn.disabled = true;
+    btn.textContent = 'Cloning…';
+    status.textContent = 'Running git clone --depth=1 …';
+    document.getElementById('file-tree').innerHTML = '';
+    document.getElementById('stats-badge').classList.remove('visible');
+
+    try {
+      const res = await fetch('/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_url: url, github_token: token }),
+      });
+      const data = await res.json();
+
+      if (data.status === 'error') {
+        status.textContent = '❌ ' + data.message;
+        return;
+      }
+
+      currentRepo = data.repo_name;
+      chatHistory = [];
+      status.textContent = '✅ Indexed successfully';
+
+      const badge = document.getElementById('stats-badge');
+      badge.textContent =
+        `${data.file_count} files · ${data.symbol_count} symbols` +
+        (data.truncated ? ' (capped at 500)' : '');
+      badge.classList.add('visible');
+
+      renderFileTree(data.file_tree);
+    } catch (err) {
+      status.textContent = '❌ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Clone & Index';
+    }
+  }
+
+  function renderFileTree(treeStr) {
+    const container = document.getElementById('file-tree');
+    const lines = treeStr.split('\n').filter(l => l.trim());
+    let html = '';
+    for (const line of lines) {
+      const indent = line.search(/\S/);
+      const name = line.trim();
+      const px = indent * 6;
+      if (name.endsWith('/')) {
+        html += `<div class="tree-dir" style="padding-left:${px}px">📁 ${escHtml(name)}</div>`;
+      } else {
+        html += `<div class="tree-file" style="padding-left:${px}px">📄 ${escHtml(name)}</div>`;
+      }
+    }
+    container.innerHTML = html;
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────────────────
+
+  function appendMessage(role, html) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.innerHTML = html;
+    document.getElementById('messages').appendChild(div);
+    div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    return div;
+  }
+
+  function renderWithCitations(text) {
+    // Match [path/to/file.ext:42] — path may not contain [ or ]
+    return escHtml(text).replace(/\[([^\[\]]+?):(\d+)\]/g, (_, file, line) =>
+      `<span class="citation" onclick="openCitation('${escAttr(file)}', ${line})">[${escHtml(file)}:${line}]</span>`
+    );
+  }
+
+  function showToolIndicator(tool, query) {
+    clearToolIndicators();
+    const icons = {
+      search_code: '🔍', get_file: '📄',
+      list_symbols: '🔎', get_file_tree: '🗂️',
+    };
+    const labels = {
+      search_code: `Searching "${query}"`,
+      get_file: `Reading ${query}`,
+      list_symbols: `Looking up "${query}"`,
+      get_file_tree: 'Getting file tree',
+    };
+    const el = document.createElement('div');
+    el.className = 'tool-indicator';
+    el.textContent = (icons[tool] || '⚙️') + ' ' + (labels[tool] || tool);
+    document.getElementById('messages').appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    toolIndicatorEl = el;
+  }
+
+  function clearToolIndicators() {
+    if (toolIndicatorEl) { toolIndicatorEl.remove(); toolIndicatorEl = null; }
+  }
+
+  async function sendMessage() {
+    if (!currentRepo) { alert('Clone a repository first.'); return; }
+    const input = document.getElementById('question-input');
+    const question = input.value.trim();
+    if (!question) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('send-btn').disabled = true;
+
+    appendMessage('user', escHtml(question));
+    chatHistory.push({ role: 'user', content: question });
+
+    const assistantDiv = appendMessage('assistant', '<em>Thinking…</em>');
+    let accumulated = '';
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo_name: currentRepo,
+          question,
+          history: chatHistory.slice(0, -1),
+        }),
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (event.type === 'tool_call') {
+            showToolIndicator(event.tool, event.query);
+          } else if (event.type === 'token') {
+            clearToolIndicators();
+            accumulated += event.content;
+            assistantDiv.innerHTML = renderWithCitations(accumulated);
+            assistantDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          } else if (event.type === 'error') {
+            accumulated += '\n\n⚠️ ' + event.message;
+            assistantDiv.innerHTML = renderWithCitations(accumulated);
+          } else if (event.type === 'done') {
+            clearToolIndicators();
+            if (!accumulated) assistantDiv.innerHTML = '<em>No response received.</em>';
+          }
+        }
+      }
+    } catch (err) {
+      assistantDiv.innerHTML = '❌ Request failed: ' + escHtml(err.message);
+    } finally {
+      document.getElementById('send-btn').disabled = false;
+      if (accumulated) chatHistory.push({ role: 'assistant', content: accumulated });
+    }
+  }
+
+  document.getElementById('question-input').addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  // ── Citation modal ────────────────────────────────────────────────────────────
+
+  async function openCitation(file, line) {
+    if (!currentRepo) return;
+    document.getElementById('modal-path').textContent = file + ':' + line;
+    document.getElementById('modal-code').textContent = 'Loading…';
+    document.getElementById('modal-overlay').classList.add('visible');
+
+    try {
+      const res = await fetch(
+        `/file?repo_name=${encodeURIComponent(currentRepo)}&path=${encodeURIComponent(file)}`
+      );
+      if (!res.ok) {
+        document.getElementById('modal-code').textContent = 'File not found in index.';
+        return;
+      }
+      const data = await res.json();
+
+      const codeEl = document.getElementById('modal-code');
+      codeEl.className = 'language-' + data.language;
+      codeEl.textContent = data.content;
+      hljs.highlightElement(codeEl);
+      highlightLine(codeEl, parseInt(line, 10));
+    } catch (err) {
+      document.getElementById('modal-code').textContent = 'Error: ' + err.message;
+    }
+  }
+
+  function highlightLine(codeEl, targetLine) {
+    const html = codeEl.innerHTML;
+    const lines = html.split('\n');
+    codeEl.innerHTML = lines.map((l, i) =>
+      `<span class="${i + 1 === targetLine ? 'highlighted-line' : ''}">${l}</span>`
+    ).join('\n');
+    const highlighted = codeEl.querySelector('.highlighted-line');
+    if (highlighted) highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('visible');
+  }
+
+  function handleOverlayClick(event) {
+    if (event.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  // ── Export chat ───────────────────────────────────────────────────────────────
+
+  function exportChat() {
+    if (chatHistory.length === 0) { alert('No conversation to export.'); return; }
+    const md = chatHistory
+      .map(m => `**${m.role === 'user' ? 'User' : 'Assistant'}:** ${m.content}`)
+      .join('\n\n---\n\n');
+    navigator.clipboard.writeText(md).then(
+      () => {
+        const btn = document.getElementById('export-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Export'; }, 1500);
+      },
+      () => alert('Clipboard write failed — copy manually.')
+    );
+  }
+</script>
+</body>
+</html>
